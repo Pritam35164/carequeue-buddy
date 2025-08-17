@@ -18,7 +18,7 @@ interface GoogleMapProps {
 const GOOGLE_MAPS_API_KEY = 'AIzaSyCBD4KiuDP6Dj6n7Z_fMtGNcEsSYzA2KnQ';
 
 export const GoogleMap = ({ 
-  center = { lat: 40.7128, lng: -74.0060 }, // Default to NYC
+  center = { lat: 19.0760, lng: 72.8777 }, // Default to Mumbai, India
   zoom = 13,
   onMapLoad,
   className = "w-full h-96"

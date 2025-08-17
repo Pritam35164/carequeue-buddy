@@ -2,10 +2,10 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Send, MessageCircle } from "lucide-react";
+import { ArrowLeft, Send, MessageCircle, Clock, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 
@@ -14,8 +14,10 @@ interface Appointment {
   clinic_id: string;
   token_number: number;
   status: string;
+  queue_position: number | null;
   clinic: {
     name: string;
+    address: string;
     admin_id: string;
   };
 }
@@ -36,6 +38,7 @@ export const ChatPage = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -48,19 +51,21 @@ export const ChatPage = () => {
     if (selectedAppointment) {
       fetchChatMessages(selectedAppointment.id);
       
-      // Set up real-time subscription for messages
+      // Set up real-time subscription for messages with immediate updates
       const messagesChannel = supabase
         .channel(`chat-${selectedAppointment.id}`)
         .on(
           'postgres_changes',
           {
-            event: '*',
+            event: 'INSERT',
             schema: 'public',
             table: 'chat_messages',
             filter: `appointment_id=eq.${selectedAppointment.id}`
           },
-          () => {
-            fetchChatMessages(selectedAppointment.id);
+          (payload) => {
+            // Add the new message immediately without refetching
+            const newMessage = payload.new as ChatMessage;
+            setChatMessages(prev => [...prev, newMessage]);
           }
         )
         .subscribe();
@@ -76,7 +81,7 @@ export const ChatPage = () => {
       .from('appointments')
       .select(`
         *,
-        clinic:clinics(name, admin_id)
+        clinic:clinics(name, address, admin_id)
       `)
       .eq('patient_id', profile?.id)
       .in('status', ['pending', 'confirmed', 'in_progress'])
@@ -184,24 +189,43 @@ export const ChatPage = () => {
             <CardContent>
               <div className="space-y-3">
                 {appointments.map((appointment) => (
-                  <div
-                    key={appointment.id}
-                    className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                      selectedAppointment?.id === appointment.id
-                        ? 'bg-primary text-primary-foreground'
-                        : 'hover:bg-muted'
-                    }`}
-                    onClick={() => setSelectedAppointment(appointment)}
-                  >
-                    <h4 className="font-medium">{appointment.clinic.name}</h4>
-                    <p className="text-sm opacity-80">Token #{appointment.token_number}</p>
-                    <Badge 
-                      variant={selectedAppointment?.id === appointment.id ? "secondary" : "outline"}
-                      className="mt-1"
-                    >
-                      {appointment.status}
-                    </Badge>
-                  </div>
+                   <div
+                     key={appointment.id}
+                     className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                       selectedAppointment?.id === appointment.id
+                         ? 'bg-primary text-primary-foreground'
+                         : 'hover:bg-muted'
+                     }`}
+                     onClick={() => setSelectedAppointment(appointment)}
+                   >
+                     <div className="flex-1">
+                       <h4 className="font-medium flex items-center gap-2">
+                         {appointment.clinic.name}
+                         <Badge 
+                           variant={selectedAppointment?.id === appointment.id ? "secondary" : "outline"}
+                           className="text-xs"
+                         >
+                           #{appointment.token_number}
+                         </Badge>
+                       </h4>
+                       <p className="text-sm opacity-80 flex items-center gap-4 mt-1">
+                         <span className="flex items-center gap-1">
+                           <MapPin className="h-3 w-3" />
+                           {appointment.clinic.address}
+                         </span>
+                         <span className="flex items-center gap-1">
+                           <Clock className="h-3 w-3" />
+                           {appointment.status}
+                         </span>
+                       </p>
+                       {appointment.queue_position && (
+                         <p className="text-xs text-muted-foreground mt-1">
+                           Queue Position: {appointment.queue_position}
+                         </p>
+                       )}
+                     </div>
+                     <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                   </div>
                 ))}
               </div>
             </CardContent>
@@ -210,9 +234,21 @@ export const ChatPage = () => {
           {/* Chat Area */}
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <MessageCircle className="h-5 w-5" />
                 {selectedAppointment ? `Chat - ${selectedAppointment.clinic.name}` : 'Select an Appointment'}
               </CardTitle>
+              {selectedAppointment && (
+                <CardDescription className="flex items-center gap-4">
+                  <span>Token #{selectedAppointment.token_number}</span>
+                  <Badge variant={selectedAppointment.status === 'pending' ? 'default' : 'secondary'}>
+                    {selectedAppointment.status}
+                  </Badge>
+                  {selectedAppointment.queue_position && (
+                    <span className="text-sm">Queue Position: {selectedAppointment.queue_position}</span>
+                  )}
+                </CardDescription>
+              )}
             </CardHeader>
             <CardContent>
               {selectedAppointment ? (

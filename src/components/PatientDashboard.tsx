@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { MapPin, Clock, Users, Phone, Calendar, Navigation, MessageCircle, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { MapPin, Clock, Users, Phone, Calendar, Navigation, MessageCircle, X, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 
@@ -36,16 +37,55 @@ export const PatientDashboard = () => {
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
   const [clinics, setClinics] = useState<Clinic[]>([]);
+  const [filteredClinics, setFilteredClinics] = useState<Clinic[]>([]);
   const [selectedClinic, setSelectedClinic] = useState<Clinic | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
     fetchClinics();
     fetchAppointments();
-  }, []);
+    
+    // Set up real-time subscription for appointments
+    const appointmentsSubscription = supabase
+      .channel('appointments_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'appointments',
+          filter: `patient_id=eq.${profile?.id}`
+        },
+        () => {
+          fetchAppointments();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(appointmentsSubscription);
+    };
+  }, [profile?.id]);
+
+  // Filter clinics based on search term
+  useEffect(() => {
+    if (!searchTerm) {
+      setFilteredClinics(clinics);
+    } else {
+      const filtered = clinics.filter(clinic =>
+        clinic.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        clinic.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        clinic.specialties?.some(specialty => 
+          specialty.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      );
+      setFilteredClinics(filtered);
+    }
+  }, [clinics, searchTerm]);
 
   const fetchClinics = async () => {
     const { data } = await supabase
@@ -53,7 +93,10 @@ export const PatientDashboard = () => {
       .select('*')
       .order('name');
     
-    if (data) setClinics(data);
+    if (data) {
+      setClinics(data);
+      setFilteredClinics(data);
+    }
     setLoading(false);
   };
 
@@ -72,7 +115,7 @@ export const PatientDashboard = () => {
 
   const handleMapLoad = (map: google.maps.Map) => {
     // Add clinic markers
-    clinics.forEach(clinic => {
+    filteredClinics.forEach(clinic => {
       const marker = new google.maps.Marker({
         position: { lat: Number(clinic.latitude), lng: Number(clinic.longitude) },
         map,
@@ -278,16 +321,33 @@ export const PatientDashboard = () => {
           <CardContent>
             <GoogleMap 
               className="w-full h-96"
-              center={{ lat: 40.7128, lng: -74.0060 }}
+              center={{ lat: 19.0760, lng: 72.8777 }}
               zoom={13}
               onMapLoad={handleMapLoad}
             />
           </CardContent>
         </Card>
 
+        {/* Search Bar */}
+        <div className="mb-6">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              type="text"
+              placeholder="Search clinics by name, location, or specialty..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+
         {/* Clinic List */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {clinics.map((clinic) => (
+          <h2 className="text-2xl font-bold text-foreground mb-4 md:col-span-2 lg:col-span-3">
+            Available Clinics {searchTerm && `(${filteredClinics.length} found)`}
+          </h2>
+          {filteredClinics.map((clinic) => (
             <Card key={clinic.id} className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setSelectedClinic(clinic)}>
               <CardHeader>
                 <div className="flex items-start justify-between">

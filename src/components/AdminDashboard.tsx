@@ -52,7 +52,7 @@ export const AdminDashboard = () => {
     fetchAppointments();
     fetchClinicInfo();
     
-    // Set up real-time subscription for appointments
+    // Set up real-time subscription for appointments with immediate updates
     const appointmentsChannel = supabase
       .channel('appointments-changes')
       .on(
@@ -62,7 +62,8 @@ export const AdminDashboard = () => {
           schema: 'public',
           table: 'appointments'
         },
-        () => {
+        (payload) => {
+          // Immediate refresh when appointments change
           fetchAppointments();
         }
       )
