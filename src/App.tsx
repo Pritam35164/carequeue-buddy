@@ -8,6 +8,8 @@ import { AuthPage } from "./components/AuthPage";
 import { AuthConfirm } from "./components/AuthConfirm";
 import { PatientDashboard } from "./components/PatientDashboard";
 import { AdminDashboard } from "./components/AdminDashboard";
+import { ChatPage } from "./components/ChatPage";
+import { ClinicSetup } from "./components/ClinicSetup";
 import Index from "./pages/Index";
 
 const queryClient = new QueryClient();
@@ -47,6 +49,24 @@ const AppContent = () => {
           <AdminDashboard />
         ) : (
           <PatientDashboard />
+        )
+      } />
+      <Route path="/chat" element={
+        !session ? (
+          <Navigate to="/auth" replace />
+        ) : profile?.role === 'patient' ? (
+          <ChatPage />
+        ) : (
+          <Navigate to="/dashboard" replace />
+        )
+      } />
+      <Route path="/clinic-setup" element={
+        !session ? (
+          <Navigate to="/auth" replace />
+        ) : profile?.role === 'admin' ? (
+          <ClinicSetup />
+        ) : (
+          <Navigate to="/dashboard" replace />
         )
       } />
       <Route path="*" element={<Navigate to="/" replace />} />

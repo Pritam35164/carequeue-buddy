@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { MapPin, Clock, Users, Phone, Calendar, Navigation } from "lucide-react";
+import { MapPin, Clock, Users, Phone, Calendar, Navigation, MessageCircle, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 interface Clinic {
   id: string;
@@ -33,6 +34,7 @@ interface Appointment {
 
 export const PatientDashboard = () => {
   const { profile, signOut } = useAuth();
+  const navigate = useNavigate();
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [selectedClinic, setSelectedClinic] = useState<Clinic | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -142,7 +144,7 @@ export const PatientDashboard = () => {
         description: `Your token number is ${nextToken}. You are position ${queuePosition} in the queue.`
       });
       
-      // Show route to clinic
+      // Show route to clinic immediately
       const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(selectedClinic.address)}`;
       window.open(directionsUrl, '_blank');
       
@@ -151,6 +153,27 @@ export const PatientDashboard = () => {
     }
     
     setBookingLoading(false);
+  };
+
+  const cancelAppointment = async (appointmentId: string) => {
+    const { error } = await supabase
+      .from('appointments')
+      .update({ status: 'cancelled' })
+      .eq('id', appointmentId);
+
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Cancellation Failed",
+        description: error.message
+      });
+    } else {
+      toast({
+        title: "Appointment Cancelled",
+        description: "Your appointment has been cancelled successfully"
+      });
+      fetchAppointments();
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -190,7 +213,13 @@ export const PatientDashboard = () => {
         {appointments.length > 0 && (
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Your Current Appointments</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Your Current Appointments</CardTitle>
+                <Button variant="outline" onClick={() => navigate('/chat')}>
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  Chat
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -203,13 +232,35 @@ export const PatientDashboard = () => {
                         Position: {appointment.queue_position} in queue
                       </p>
                     </div>
-                    <div className="text-right">
-                      <Badge variant="secondary">{appointment.status}</Badge>
-                      {appointment.estimated_time && (
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Est: {new Date(appointment.estimated_time).toLocaleTimeString()}
-                        </p>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <Badge variant="secondary">{appointment.status}</Badge>
+                        {appointment.estimated_time && (
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Est: {new Date(appointment.estimated_time).toLocaleTimeString()}
+                          </p>
+                        )}
+                      </div>
+                      {appointment.status !== 'cancelled' && appointment.status !== 'completed' && (
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          onClick={() => cancelAppointment(appointment.id)}
+                        >
+                          <X className="h-4 w-4 mr-1" />
+                          Cancel
+                        </Button>
                       )}
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(appointment.clinic.address)}`;
+                          window.open(directionsUrl, '_blank');
+                        }}
+                      >
+                        <Navigation className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 ))}

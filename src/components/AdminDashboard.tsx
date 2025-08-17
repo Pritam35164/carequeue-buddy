@@ -8,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Users, Clock, MessageCircle, Settings, Send } from "lucide-react";
+import { Users, Clock, MessageCircle, Settings, Send, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 interface Appointment {
   id: string;
@@ -37,12 +38,14 @@ interface ChatMessage {
 
 export const AdminDashboard = () => {
   const { profile, signOut } = useAuth();
+  const navigate = useNavigate();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [clinicStatus, setClinicStatus] = useState<'open' | 'busy' | 'closed'>('open');
   const [loading, setLoading] = useState(true);
+  const [hasClinic, setHasClinic] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -102,6 +105,9 @@ export const AdminDashboard = () => {
 
     if (clinic) {
       setClinicStatus(clinic.status);
+      setHasClinic(true);
+    } else {
+      setHasClinic(false);
     }
   };
 
@@ -228,20 +234,31 @@ export const AdminDashboard = () => {
             <p className="text-muted-foreground">Manage your clinic queue and appointments</p>
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              <span className="text-sm">Clinic Status:</span>
-              <Select value={clinicStatus} onValueChange={(value: 'open' | 'busy' | 'closed') => updateClinicStatus(value)}>
-                <SelectTrigger className="w-24">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="busy">Busy</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {hasClinic ? (
+              <div className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                <span className="text-sm">Clinic Status:</span>
+                <Select value={clinicStatus} onValueChange={(value: 'open' | 'busy' | 'closed') => updateClinicStatus(value)}>
+                  <SelectTrigger className="w-24">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="busy">Busy</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <Button onClick={() => navigate('/clinic-setup')}>
+                <MapPin className="h-4 w-4 mr-2" />
+                Set Up Clinic
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => navigate('/clinic-setup')}>
+              <Settings className="h-4 w-4 mr-2" />
+              Clinic Settings
+            </Button>
             <Button variant="outline" onClick={signOut}>
               Sign Out
             </Button>
